@@ -447,12 +447,7 @@ class WebServer {
             builder.append("\n");
             builder.append("{ \"error\": \"" + e.getMessage() + "\" }");
           }
-        }
-
-
-        //}
-
-       else {
+        } else {
           // if the request is not recognized at all
 
           builder.append("HTTP/1.1 400 Bad Request\n");
