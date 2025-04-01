@@ -19,12 +19,17 @@ package funHttpServer;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.nio.charset.Charset;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONException;
+
 
 class WebServer {
   public static void main(String args[]) {
@@ -202,9 +207,24 @@ class WebServer {
           query_pairs = splitQuery(request.replace("multiply?", ""));
 
           try {
+            // Check if both num1 and num2 parameters are present and have valid values
+            String num1Str = query_pairs.get("num1");
+            String num2Str = query_pairs.get("num2");
+
+            // Check for missing or improperly formatted parameters
+            if (num1Str == null || num2Str == null) {
+              throw new IllegalArgumentException("Both 'num1' and 'num2' parameters are required.");
+            }
+
+            // Check if either parameter is empty, indicating wrong format (e.g., num1=4&num2= -see how num2 is missing)
+            if (num1Str.isEmpty() || num2Str.isEmpty()) {
+              throw new IllegalArgumentException("Both 'num1' and 'num2' must have values.");
+            }
+
+            /*
             if (!query_pairs.containsKey("num1") || !query_pairs.containsKey("num2")) {
               throw new IllegalArgumentException("Missing parameter: num1 and num2 are required.");
-            }
+            } */
 
             // extract required fields from parameters
             Integer num1 = Integer.parseInt(query_pairs.get("num1"));
@@ -219,8 +239,8 @@ class WebServer {
             builder.append("\n");
             builder.append("Result is: " + result);
 
-          // TODO: Include error handling here with a correct error code and
-          // a response that makes sense
+            // TODO: Include error handling here with a correct error code and
+            // a response that makes sense
           } catch (NumberFormatException e) {
             builder.append("HTTP/1.1 400 Bad Request\n");
             builder.append("Content-Type: application/json; charset=utf-8\n");
@@ -244,17 +264,195 @@ class WebServer {
 
           Map<String, String> query_pairs = new LinkedHashMap<String, String>();
           query_pairs = splitQuery(request.replace("github?", ""));
-          String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
-          System.out.println(json);
 
-          builder.append("HTTP/1.1 200 OK\n");
-          builder.append("Content-Type: text/html; charset=utf-8\n");
-          builder.append("\n");
-          builder.append("Check the todos mentioned in the Java source file");
-          // TODO: Parse the JSON returned by your fetch and create an appropriate
-          // response based on what the assignment document asks for
+          String query = query_pairs.get("query");
 
-        } else {
+          if (query == null || query.isEmpty()) {
+            builder.append("HTTP/1.1 404 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("<html><body><h1>Bad Request: Missing 'query' parameter.</h1></body></html>");
+          } else {
+            try {
+              String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
+              //System.out.println(json);
+
+              if (json == null || json.isEmpty()) {
+                builder.append("HTTP/1.1 404 Not Found\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("<html><body><h1>Not Found: No data returned from GitHub API.</h1></body></html>");
+              } else {
+
+                try {
+                  JSONArray repos = new JSONArray(json);
+                  StringBuilder repoDetails = new StringBuilder();
+
+                  for (int i = 0; i < repos.length(); i++) {
+                    JSONObject repo = repos.getJSONObject(i);
+                    String fullName = repo.getString("full_name");
+                    int id = repo.getInt("id");
+                    JSONObject owner = repo.getJSONObject("owner");
+                    String login = owner.getString("login");
+
+                    // Add each repo's details to the response
+                    repoDetails.append("<div>");
+                    repoDetails.append("<h3>").append(fullName).append("</h3>");
+                    repoDetails.append("<p>ID: ").append(id).append("</p>");
+                    repoDetails.append("<p>Owner Login: ").append(login).append("</p>");
+                    repoDetails.append("</div>");
+                  }
+
+                  // Generate response
+                  builder.append("HTTP/1.1 200 OK\n");
+                  builder.append("Content-Type: text/html; charset=utf-8\n");
+                  builder.append("\n");
+                  builder.append("<html><body>");
+                  builder.append("<h1>GitHub Repositories</h1>");
+                  builder.append(repoDetails.toString());
+                  builder.append("</body></html>");
+
+                } catch (JSONException e) {
+                  builder.append("HTTP/1.1 500 Internal Server Error\n");
+                  builder.append("Content-Type: text/html; charset=utf-8\n");
+                  builder.append("\n");
+                  builder.append("<html><body><h1>Internal Server Error: Invalid JSON format.</h1></body></html>");
+
+                }
+              }
+            } catch (Exception e) {
+              builder.append("HTTP/1.1 500 Internal Server Error\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("<html><body><h1>Internal Server Error: " + e.getMessage() + "</h1></body></html>");
+              //builder.append("Check the todos mentioned in the Java source file");
+              // TODO: Parse the JSON returned by your fetch and create an appropriate
+              // response based on what the assignment document asks for
+            }
+          }
+        } else if (request.contains("primeFactors?")) {
+          // This calculates the prime factors of a number with a minimum factor, with error handling.
+
+          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+          // Extract path parameters
+          query_pairs = splitQuery(request.replace("primeFactors?", ""));
+
+          try {
+            // Check if both number and min_factor parameters are present and have valid values
+            String numberStr = query_pairs.get("number");
+            String minFactorStr = query_pairs.get("min_factor");
+
+            // Check for missing or improperly formatted parameters
+            if (numberStr == null || minFactorStr == null) {
+              throw new IllegalArgumentException("Both 'number' and 'min_factor' parameters are required.");
+            }
+
+            // Check if either parameter is empty, indicating wrong format (e.g., number=10&min_factor= is missing)
+            if (numberStr.isEmpty() || minFactorStr.isEmpty()) {
+              throw new IllegalArgumentException("Both 'number' and 'min_factor' must have values.");
+            }
+
+            // Extract the required fields from parameters
+            Integer number = Integer.parseInt(numberStr);
+            Integer minFactor = Integer.parseInt(minFactorStr);
+
+            // Validate number and min_factor
+            if (number <= 1 || minFactor <= 1) {
+              throw new IllegalArgumentException("'number' and 'min_factor' must be greater than 1.");
+            }
+
+            // Find prime factors starting from the minimum factor
+            List<Integer> primeFactors = new ArrayList<>();
+
+            // Start checking factors from minFactor
+            for (int i = minFactor; i <= number; i++) {
+              while (number % i == 0) { // If i is a factor of the number
+                primeFactors.add(i);  // Add it to the primeFactors list
+                number /= i;           // Divide number by i to get the next part
+              }
+            }
+
+            // Generate response
+            builder.append("HTTP/1.1 200 OK\n");
+            builder.append("Content-Type: application/json; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("{\"primeFactors\": " + new JSONArray(primeFactors).toString() + "}");
+
+          } catch (NumberFormatException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: application/json; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("{ \"error\": \"Invalid input. Please provide valid numbers for both 'number' and 'min_factor'.\" }");
+
+          } catch (IllegalArgumentException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: application/json; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("{ \"error\": \"" + e.getMessage() + "\" }");
+          }
+        } else if (request.contains("fibonacci?")) {
+          // Extract parameters for Fibonacci sequence
+          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+          query_pairs = splitQuery(request.replace("fibonacci?", ""));
+
+          try {
+            // Extract and check parameters
+            String nStr = query_pairs.get("n");
+            String startStr = query_pairs.get("start");
+
+            // Validate parameters
+            if (nStr == null || startStr == null) {
+              throw new IllegalArgumentException("Both 'n' and 'start' parameters are required.");
+            }
+
+            if (nStr.isEmpty() || startStr.isEmpty()) {
+              throw new IllegalArgumentException("Both 'n' and 'start' must have values.");
+            }
+
+            Integer n = Integer.parseInt(nStr);
+            Integer start = Integer.parseInt(startStr);
+
+            // Check if 'start' is valid
+            if (start != 0 && start != 1) {
+              throw new IllegalArgumentException("The 'start' parameter must be either 0 or 1.");
+            }
+
+            // Generate Fibonacci sequence
+            List<Integer> fibonacciSequence = new ArrayList<>();
+            int a = start;
+            int b = start == 0 ? 1 : 1; // Starting from 0 or 1
+            fibonacciSequence.add(a);
+            for (int i = 1; i < n; i++) {
+              fibonacciSequence.add(b);
+              int temp = a + b;
+              a = b;
+              b = temp;
+            }
+
+            // Build response
+            builder.append("HTTP/1.1 200 OK\n");
+            builder.append("Content-Type: application/json; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("{ \"fibonacciSequence\": " + fibonacciSequence.toString() + " }");
+
+          } catch (NumberFormatException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: application/json; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("{ \"error\": \"Invalid input. Please provide valid integers for 'n' and 'start'.\" }");
+
+          } catch (IllegalArgumentException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: application/json; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("{ \"error\": \"" + e.getMessage() + "\" }");
+          }
+        }
+
+
+        //}
+
+       else {
           // if the request is not recognized at all
 
           builder.append("HTTP/1.1 400 Bad Request\n");
